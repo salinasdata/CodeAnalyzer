@@ -17,7 +17,7 @@ openai.api_key = config['OPENAI_API_KEY']
 os.environ['OPENAI_API_KEY'] = config['OPENAI_API_KEY']
 
 # Paths and patterns
-local_repo_path = '/Users/adrianashymoniak/projects/azure-search-openai-demo/**'
+local_repo_path = config['LOCAL_REPO_PATH']
 file_patterns = ['*.json', '*.txt', '*.py', '*.md']
 
 
