@@ -128,7 +128,7 @@ class Analyzer:
                 processed = {'title': result.split(':')[0],
                              'summary': result.split(':')[1][1:]
                              }
-            elif '-' in e:
+            elif '-' in result:
                 processed = {'title': result.split('-')[0],
                              'summary': result.split('-')[1][1:]
                              }
