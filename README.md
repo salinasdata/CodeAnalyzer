@@ -9,3 +9,5 @@ Initial setup:
 The `.env` file is actually a text file with a pairs `VARIABLE=VALUE`. This file should contain the following `VARIABLE=VALUE` pairs:
 - OPENAI_API_KEY=<open_ai_key_placed_here>
 - LOCAL_REPO_PATH=<path_to_your_local_repository>
+- LOCAL_REPO=True/False
+- GITHUB_REPO=<github_url>
