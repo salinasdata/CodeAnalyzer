@@ -1,10 +1,10 @@
+import base64
 import glob
-import os
+import json
 from datetime import datetime
 
 import numpy as np
-import openai
-from dotenv import dotenv_values
+import requests
 from langchain import OpenAI
 from langchain.chains.llm import LLMChain
 from langchain.prompts import PromptTemplate
@@ -12,13 +12,7 @@ from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-config = dotenv_values('.env')
-openai.api_key = config['OPENAI_API_KEY']
-os.environ['OPENAI_API_KEY'] = config['OPENAI_API_KEY']
-
-# Paths and patterns
-local_repo_path = config['LOCAL_REPO_PATH']
-file_patterns = ['*.json', '*.txt', '*.py', '*.md']
+from configs import Config
 
 
 class Analyzer:
@@ -33,6 +27,7 @@ class Analyzer:
     automating many repetitive processes.
     TITLE AND CONCISE SUMMARY:
     """
+    config = Config()
 
     def __init__(self, file, content):
         self.map_llm = OpenAI(temperature=0, model_name='text-davinci-003')
@@ -40,14 +35,43 @@ class Analyzer:
         self.content = content
 
     @staticmethod
-    def get_files_from_dir(dir_path: str, patterns: list):
+    def get_files_from_dir():
         """
         Function to get files from local directory
 
         """
         files_list = []
-        for pattern in patterns:
-            files_list.extend(glob.glob(dir_path + '/' + pattern, recursive=True))
+        is_local = Analyzer.config.is_local
+        file_patterns = Analyzer.config.file_patterns
+        github_repo = Analyzer.config.github_repo
+        dir_path = Analyzer.config.dir_path
+        owner = Analyzer.config.owner
+        repo_name = Analyzer.config.repo_name
+        default_branch = Analyzer.config.default_branch
+
+        if is_local:
+            for pattern in file_patterns:
+                files_list.extend(glob.glob(dir_path + '/' + pattern,
+                                            recursive=True))
+        else:
+
+            all_files_endpoint = (
+                f"https://api.github.com/repos/{owner}/"
+                f"{repo_name}/git/trees/{default_branch}?recursive=1")
+
+            response = requests.get(all_files_endpoint)
+            if response.status_code == 200:
+                repo = response.json()
+                if repo.get('tree') is not None:
+                    tree = repo.get('tree')
+                    files_list = [
+                        item['path'] for item in tree
+                        if f"*.{item['path'].split('.')[-1]}" in file_patterns
+                    ]
+                else:
+                    print("Repository tree is empty")
+            else:
+                print(f"Repository cannot bee accessed {github_repo}")
         return files_list
 
     @staticmethod
@@ -55,11 +79,26 @@ class Analyzer:
         """
         Function to read content of the files
         """
-
         contents_dict = {}
-        for file_path in file_paths:
-            with open(file_path, 'r') as f:
-                contents_dict[file_path] = f.read()
+        is_local = Analyzer.config.is_local
+
+        if is_local:
+            for file_path in file_paths:
+                with open(file_path, 'r') as f:
+                    contents_dict[file_path] = f.read()
+        else:
+            owner = Analyzer.config.owner
+            repo_name = Analyzer.config.repo_name
+            for file_path in file_paths:
+                file_content_api = (
+                    f'https://api.github.com/repos/{owner}/{repo_name}/contents/{file_path}'
+                )
+                response = requests.get(file_content_api)
+                if response.status_code == 200:
+                    contents_dict[file_path] = (
+                        base64.b64decode(response.json()['content']).decode(
+                            'UTF-8')
+                    )
         return contents_dict
 
     @staticmethod
@@ -221,7 +260,7 @@ if __name__ == "__main__":
     """
 
     # Fetch files
-    files = Analyzer.get_files_from_dir(local_repo_path, file_patterns)
+    files = Analyzer.get_files_from_dir()
 
     # Iterate over files and process
     for _file, _content in Analyzer.read_files(files).items():
