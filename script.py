@@ -1,6 +1,5 @@
 import base64
 import glob
-import json
 from datetime import datetime
 
 import numpy as np
@@ -124,7 +123,7 @@ class Analyzer:
         summaries = []
         for chunk in chunks_list:
             chunk_summary = llm_chain.apply([{'text': chunk}])
-            summaries.append(chunk_summary)
+            summaries.append(f" {chunk_summary}")
         return summaries
 
     @staticmethod
@@ -233,22 +232,31 @@ class Analyzer:
     def analyze_file(self):
         print(f'Processing {self.file}...')
 
+        print(f"Get chunks from {self.file}...")
         chunks = Analyzer.get_chunks_from_text(self.content)
+        print("Chunks generated!")
 
         # Summarize chunks
+        print("Summarizing chunks...")
         chunk_summaries = (
             self.summarize_chunks(
                 chunks,
                 self.get_prompt_template(Analyzer.main_prompt))
         )
+        print("Chunks summarized!")
 
         # Create similarity matrix
+        print("Creating similarity matrix...")
         similarity_matrix = Analyzer.create_similarity_matrix(chunks)
+        print("Similarity matrix created!")
 
         # Get topics
+        print("Getting topics...")
         topics = Analyzer.get_topics(similarity_matrix)
+        print("Topics are got!")
 
         # Summarize stage
+        print("Get stage summary...")
         stage_summary = self.summarize_stage(chunk_summaries, topics)
 
         print(f'Summary for {self.file}:\n{stage_summary}\n')
