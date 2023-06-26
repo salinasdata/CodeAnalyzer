@@ -26,6 +26,22 @@ class Analyzer:
     automating many repetitive processes.
     TITLE AND CONCISE SUMMARY:
     """
+
+    summarize_prompt = """Write a detailed summary on the structure of the provided 
+       content which contains code from selected files from a Github repository, which 
+       deploys a chatbot system in Microsoft Azure. Please list all necessary details 
+       which can be extrapolated later to specific guidelines how to reverse engineer 
+       the repository. I am specifically looking for answers on: 
+       i. the specific steps to deploy this resource? Please list all the files that 
+       contain the specific tasks that automate the deployment!
+       ii. relevant files and code sections that I need to alter in case I want to 
+       adjust the overall tool of the repository for my use case. Please list all 
+       files and name the code sections.
+       iii. the detailed steps that need to be performed in order to adjust this 
+       repository as a project template for customized deployments.: 
+       {text}
+       """
+
     config = Config()
 
     def __init__(self, file, content):
@@ -53,7 +69,6 @@ class Analyzer:
                 files_list.extend(glob.glob(dir_path + '/' + pattern,
                                             recursive=True))
         else:
-
             all_files_endpoint = (
                 f"https://api.github.com/repos/{owner}/"
                 f"{repo_name}/git/trees/{default_branch}?recursive=1")
@@ -185,22 +200,8 @@ class Analyzer:
         print(f'Start time: {datetime.now()}')
 
         # Prompt to get title and summary for each topic
-        prompt = """Write a detailed summary on the structure of the provided 
-        content which contains code from selected files from a Github repository, which 
-        deploys a chatbot system in Microsoft Azure. Please list all necessary details 
-        which can be extrapolated later to specific guidelines how to reverse engineer 
-        the repository. I am specifically looking for answers on: 
-        i. the specific steps to deploy this resource? Please list all the files that 
-        contain the specific tasks that automate the deployment!
-        ii. relevant files and code sections that I need to alter in case I want to 
-        adjust the overall tool of the repository for my use case. Please list all 
-        files and name the code sections.
-        iii. the detailed steps that need to be performed in order to adjust this 
-        repository as a project template for customized deployments.: 
-        {text}
-        """
 
-        map_prompt = PromptTemplate(template=prompt,
+        map_prompt = PromptTemplate(template=Analyzer.summarize_prompt,
                                     input_variables=["text"])
 
         # Define the LLMs
