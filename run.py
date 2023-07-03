@@ -6,14 +6,28 @@ import uvicorn
 from fastapi import FastAPI, WebSocket, Request
 from fastapi.templating import Jinja2Templates
 
-from app.backend.analyzer import Analyzer
+from analyzer import Analyzer
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent
 
 templates = Jinja2Templates(directory=str(Path(BASE_DIR, 'templates')))
 log_file = "Logs"
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title='Code Analyzer')
+
+origins = [
+    "*",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
