@@ -1,12 +1,13 @@
 import base64
 import glob
 from datetime import datetime
+from typing import Optional
 
+import aiohttp
 import numpy as np
 import requests
-from langchain import OpenAI
-from langchain.chains.llm import LLMChain
-from langchain.prompts import PromptTemplate
+from fastapi import WebSocket
+from langchain import OpenAI, LLMChain, PromptTemplate
 from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -44,13 +45,14 @@ class Analyzer:
 
     config = Config()
 
-    def __init__(self, file, content):
+    def __init__(self, file: str, content: str, websocket: Optional[WebSocket] = None):
         self.map_llm = OpenAI(temperature=0, model_name='text-davinci-003')
         self.file = file
         self.content = content
+        self.websocket = websocket
 
     @staticmethod
-    def get_files_from_dir():
+    def get_files_from_dir() -> list:
         """
         Function to get files from local directory
 
@@ -89,6 +91,49 @@ class Analyzer:
         return files_list
 
     @staticmethod
+    async def aget_files_from_dir(github_repo: str, websocket: WebSocket) -> tuple:
+        """
+        Function to get files from local directory
+
+        """
+        files_list = []
+        file_patterns = Analyzer.config.file_patterns
+        repo_metadata = github_repo.split("github.com/")[-1]
+        owner, repo_name = repo_metadata.split("/")
+        default_branch = 'master'
+
+        async with aiohttp.ClientSession(
+                connector=aiohttp.TCPConnector(verify_ssl=False)) as aio_session:
+            endpoint = f"https://api.github.com/repos/{owner}/{repo_name}"
+            async with aio_session.get(endpoint) as response:
+                if response.status == 200:
+                    default_branch = (await response.json())['default_branch']
+
+            all_files_endpoint = (
+                f"https://api.github.com/repos/{owner}/"
+                f"{repo_name}/git/trees/{default_branch}?recursive=1")
+
+            async with aio_session.get(all_files_endpoint) as response:
+                if response.status == 200:  # NOQA
+                    repo = await response.json()
+                    if repo.get('tree') is not None:
+                        tree = repo.get('tree')
+                        files_list = [
+                            item['path'] for item in tree
+                            if f"*.{item['path'].split('.')[-1]}" in file_patterns
+                        ]
+                    else:
+                        message = "Repository tree is empty"
+                        await websocket.send_text(message)
+                        print(message)
+                else:
+                    message = f"Repository cannot bee accessed {github_repo}"
+                    await websocket.send_text(message)
+                    print(message)
+
+        return files_list, owner, repo_name
+
+    @staticmethod
     def read_files(file_paths):
         """
         Function to read content of the files
@@ -116,7 +161,41 @@ class Analyzer:
         return contents_dict
 
     @staticmethod
+    async def aread_files(file_paths: list, owner: str, repo_name: str) -> dict:
+        """
+        Function to read content of the files
+        """
+        contents_dict = {}
+        async with aiohttp.ClientSession(
+                connector=aiohttp.TCPConnector(verify_ssl=False)) as aio_session:
+            for file_path in file_paths:
+                file_content_api = (
+                    f'https://api.github.com/repos/{owner}/{repo_name}/contents/{file_path}'
+                )
+                async with aio_session.get(file_content_api) as response:
+                    if response.status == 200:
+                        response = await response.json()
+                        contents_dict[file_path] = (
+                            base64.b64decode(response['content']).decode('UTF-8'))
+
+        return contents_dict
+
+    @staticmethod
     def get_chunks_from_text(text, num_chunks=10):
+        """
+        Function to break a large text into chunks
+        """
+
+        words = text.split()
+        words_per_chunk = len(words) // num_chunks
+        chunks_list = []
+        for i in range(0, len(words), words_per_chunk):
+            chunk = ' '.join(words[i:i + words_per_chunk])
+            chunks_list.append(chunk)
+        return chunks_list
+
+    @staticmethod
+    async def aget_chunks_from_text(text, num_chunks=10):
         """
         Function to break a large text into chunks
         """
@@ -141,8 +220,31 @@ class Analyzer:
             summaries.append(f" {chunk_summary}")
         return summaries
 
+    async def asummarize_chunks(self, chunks_list, template):
+        """
+        Function to summarize chunks_list using OpenAI
+        """
+
+        llm_chain = LLMChain(llm=self.map_llm, prompt=template)
+        summaries = []
+        for chunk in chunks_list:
+            chunk_summary = llm_chain.apply([{'text': chunk}])
+            summaries.append(f" {chunk_summary}")
+        return summaries
+
     @staticmethod
     def create_similarity_matrix(chunks_list):
+        """
+        Function to calculate similarity matrix
+        """
+
+        vectorizer = TfidfVectorizer(stop_words='english')
+        vectors = vectorizer.fit_transform(
+            [' '.join(chunk.split()[:200]) for chunk in chunks_list])
+        return cosine_similarity(vectors)
+
+    @staticmethod
+    async def acreate_similarity_matrix(chunks_list):
         """
         Function to calculate similarity matrix
         """
@@ -164,7 +266,47 @@ class Analyzer:
         return chunk_topics
 
     @staticmethod
+    async def aget_topics(similarity_matrix_, num_topics=5):
+        """
+        Get the topics from the similarity matrix
+        """
+        distances = 1 - similarity_matrix_
+        kmeans = KMeans(n_clusters=num_topics).fit(distances)
+        clusters = kmeans.labels_
+        chunk_topics = [np.where(clusters == i)[0] for i in range(num_topics)]
+        return chunk_topics
+
+    @staticmethod
     def parse_title_summary_results(results):
+        """
+        Function to parse title and summary results
+        """
+
+        outputs = []
+        for result in results:
+
+            result = result.replace('\n', '')
+            if '|' in result:
+                processed = {'title': result.split('|')[0],
+                             'summary': result.split('|')[1][1:]
+                             }
+            elif ':' in result:
+                processed = {'title': result.split(':')[0],
+                             'summary': result.split(':')[1][1:]
+                             }
+            elif '-' in result:
+                processed = {'title': result.split('-')[0],
+                             'summary': result.split('-')[1][1:]
+                             }
+            else:
+                processed = {'title': '',
+                             'summary': result
+                             }
+            outputs.append(processed)
+        return outputs
+
+    @staticmethod
+    async def aparse_title_summary_results(results):
         """
         Function to parse title and summary results
         """
@@ -225,8 +367,45 @@ class Analyzer:
 
         return summaries
 
+    async def asummarize_stage(self, chunks_list, topics_list):
+        """
+        Function to summarize the stage
+        """
+        await self.logger(f'Start time: {datetime.now()}')
+
+        # Prompt to get title and summary for each topic
+
+        map_prompt = PromptTemplate(template=Analyzer.summarize_prompt,
+                                    input_variables=["text"])
+
+        # Define the LLMs
+        map_llm_chain = LLMChain(llm=self.map_llm, prompt=map_prompt)
+
+        summaries = []
+        for i in range(len(topics_list)):
+            topic_summaries = []
+            for topic in topics_list[i]:
+                map_llm_chain_input = [{'text': chunks_list[topic]}]
+                # Run the input through the LLM chain (works in parallel)
+                map_llm_chain_results = map_llm_chain.apply(map_llm_chain_input)
+                stage_1_outputs = await Analyzer.aparse_title_summary_results(
+                    [e['text'] for e in map_llm_chain_results])
+                # Split the titles and summaries
+                topic_summaries.append(stage_1_outputs[0]['summary'])
+            # Concatenate all summaries of a topic
+            summaries.append(' '.join(topic_summaries))
+
+        await self.logger(f'Stage done time {datetime.now()}')
+
+        return summaries
+
     @staticmethod
     def get_prompt_template(template):
+        return PromptTemplate(template=template,
+                              input_variables=['text'])
+
+    @staticmethod
+    async def aget_prompt_template(template):
         return PromptTemplate(template=template,
                               input_variables=['text'])
 
@@ -262,18 +441,35 @@ class Analyzer:
 
         print(f'Summary for {self.file}:\n{stage_summary}\n')
 
+    async def aanalyze_file(self):
+        await self.logger(f'Processing {self.file}...')
 
-if __name__ == "__main__":
-    """
-    Main script
-    """
+        await self.logger(f"Get chunks from {self.file}...")
+        chunks = await Analyzer.aget_chunks_from_text(self.content)
+        await self.logger("Chunks generated!")
 
-    # Fetch files
-    files = Analyzer.get_files_from_dir()
+        # Summarize chunks
+        await self.logger("Summarizing chunks...")
+        chunk_summaries = (await self.asummarize_chunks(
+            chunks, await self.aget_prompt_template(Analyzer.main_prompt)))
+        await self.logger("Chunks summarized!")
 
-    # Iterate over files and process
-    for _file, _content in Analyzer.read_files(files).items():
-        code_analyzer = Analyzer(_file, _content)
-        code_analyzer.analyze_file()
+        # Create similarity matrix
+        await self.logger("Creating similarity matrix...")
+        similarity_matrix = await Analyzer.acreate_similarity_matrix(chunks)
+        await self.logger("Similarity matrix created!")
 
-    print('All files processed.')
+        # Get topics
+        await self.logger("Getting topics...")
+        topics = await Analyzer.aget_topics(similarity_matrix)
+        await self.logger("Topics are got!")
+
+        # Summarize stage
+        await self.logger("Get stage summary...")
+        stage_summary = await self.asummarize_stage(chunk_summaries, topics)
+
+        await self.logger(f'Summary for {self.file}:\n{stage_summary}\n')
+
+    async def logger(self, message):
+        print(message)
+        await self.websocket.send_text(message)
