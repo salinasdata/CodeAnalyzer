@@ -11,7 +11,7 @@ from app.backend.analyzer import Analyzer
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 templates = Jinja2Templates(directory=str(Path(BASE_DIR, 'templates')))
-log_file = "app.log"
+log_file = "Logs"
 
 app = FastAPI(title='Code Analyzer')
 
@@ -26,7 +26,7 @@ async def get(request: Request):
     Returns:
         TemplateResponse: Jinja template with context data.
     """
-    context = {"title": "FastAPI Streaming Log Viewer over WebSockets",
+    context = {"title": "Code Analyzer tool",
                "log_file": log_file}
     return templates.TemplateResponse("index.html",
                                       {"request": request, "context": context})

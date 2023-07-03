@@ -16,10 +16,10 @@
     >
         <form id="message-form" action="" onsubmit="sendMessage(event)">
             <label for="github_repo_id">GitHub public repository URL: </label>
-            <input class="flex justify-center block p-2.5 w-4/5 text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+            <input class="flex justify-center block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
                    type="text" id="github_repo_id" autocomplete="off"/>
             <label for="openai_key_id">OpenAI secret key: </label>
-            <input class="flex justify-center block p-2.5 w-4/5 text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+            <input class="flex justify-center block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
                    type="text" id="openai_key_id" autocomplete="off"/>
             <button>Submit</button>
         </form>
@@ -48,7 +48,7 @@
     ws_log.onmessage = function (event) {
         var logs = document.getElementById("logs");
         var log_data = event.data;
-        logs.innerHTML += "<pre>" + log_data + "</pre>";
+        logs.innerHTML += "<span>" + log_data + "</span>";
     };
 
     form.onsubmit = function (e) {
