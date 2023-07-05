@@ -45,11 +45,10 @@ class Analyzer:
 
     config = Config()
 
-    def __init__(self, file: str, content: str, websocket: Optional[WebSocket] = None):
+    def __init__(self, content: str, file: Optional[str] = None):
         self.map_llm = OpenAI(temperature=0, model_name='text-davinci-003')
         self.file = file
         self.content = content
-        self.websocket = websocket
 
     @staticmethod
     def get_files_from_dir() -> list:
@@ -134,7 +133,7 @@ class Analyzer:
         return files_list, owner, repo_name
 
     @staticmethod
-    def read_files(file_paths):
+    def read_files(file_paths: list) -> dict:
         """
         Function to read content of the files
         """
@@ -181,7 +180,7 @@ class Analyzer:
         return contents_dict
 
     @staticmethod
-    def get_chunks_from_text(text, num_chunks=10):
+    def get_chunks_from_text(text: str, num_chunks: int = 10) -> list:
         """
         Function to break a large text into chunks
         """
@@ -195,7 +194,7 @@ class Analyzer:
         return chunks_list
 
     @staticmethod
-    async def aget_chunks_from_text(text, num_chunks=10):
+    async def aget_chunks_from_text(text: str, num_chunks: int = 10) -> list:
         """
         Function to break a large text into chunks
         """
@@ -208,7 +207,7 @@ class Analyzer:
             chunks_list.append(chunk)
         return chunks_list
 
-    def summarize_chunks(self, chunks_list, template):
+    def summarize_chunks(self, chunks_list: list, template: PromptTemplate) -> list:
         """
         Function to summarize chunks_list using OpenAI
         """
@@ -220,7 +219,7 @@ class Analyzer:
             summaries.append(f" {chunk_summary}")
         return summaries
 
-    async def asummarize_chunks(self, chunks_list, template):
+    async def asummarize_chunks(self, chunks_list: list, template: str) -> list:
         """
         Function to summarize chunks_list using OpenAI
         """
@@ -233,7 +232,7 @@ class Analyzer:
         return summaries
 
     @staticmethod
-    def create_similarity_matrix(chunks_list):
+    def create_similarity_matrix(chunks_list: list):
         """
         Function to calculate similarity matrix
         """
@@ -244,7 +243,7 @@ class Analyzer:
         return cosine_similarity(vectors)
 
     @staticmethod
-    async def acreate_similarity_matrix(chunks_list):
+    async def acreate_similarity_matrix(chunks_list: list):
         """
         Function to calculate similarity matrix
         """
@@ -277,7 +276,7 @@ class Analyzer:
         return chunk_topics
 
     @staticmethod
-    def parse_title_summary_results(results):
+    def parse_title_summary_results(results: list) -> list:
         """
         Function to parse title and summary results
         """
@@ -306,7 +305,7 @@ class Analyzer:
         return outputs
 
     @staticmethod
-    async def aparse_title_summary_results(results):
+    async def aparse_title_summary_results(results: list) -> list:
         """
         Function to parse title and summary results
         """
@@ -334,7 +333,7 @@ class Analyzer:
             outputs.append(processed)
         return outputs
 
-    def summarize_stage(self, chunks_list, topics_list):
+    def summarize_stage(self, chunks_list: list, topics_list: list) -> list:
         """
         Function to summarize the stage
         """
@@ -367,11 +366,12 @@ class Analyzer:
 
         return summaries
 
-    async def asummarize_stage(self, chunks_list, topics_list):
+    async def asummarize_stage(self, chunks_list: list, topics_list: list,
+                               websocket: WebSocket) -> list:
         """
         Function to summarize the stage
         """
-        await self.logger(f'Start time: {datetime.now()}')
+        await self.logger(f'Start time: {datetime.now()}', websocket)
 
         # Prompt to get title and summary for each topic
 
@@ -395,21 +395,21 @@ class Analyzer:
             # Concatenate all summaries of a topic
             summaries.append(' '.join(topic_summaries))
 
-        await self.logger(f'Stage done time {datetime.now()}')
+        await self.logger(f'Stage done time {datetime.now()}', websocket)
 
         return summaries
 
     @staticmethod
-    def get_prompt_template(template):
+    def get_prompt_template(template: str) -> PromptTemplate:
         return PromptTemplate(template=template,
                               input_variables=['text'])
 
     @staticmethod
-    async def aget_prompt_template(template):
+    async def aget_prompt_template(template: str) -> PromptTemplate:
         return PromptTemplate(template=template,
                               input_variables=['text'])
 
-    def analyze_file(self):
+    def analyze_file(self) -> None:
         print(f'Processing {self.file}...')
 
         print(f"Get chunks from {self.file}...")
@@ -441,35 +441,41 @@ class Analyzer:
 
         print(f'Summary for {self.file}:\n{stage_summary}\n')
 
-    async def aanalyze_file(self):
-        await self.logger(f'Processing {self.file}...')
+    async def aanalyze_file(self, websocket: WebSocket, is_github: bool = True) -> None:
+        if is_github:
+            await self.logger(f'Processing {self.file}...', websocket)
+            await self.logger(f"Get chunks from {self.file}...", websocket)
+        else:
+            await self.logger(f'Processing...', websocket)
+            await self.logger(f"Get chunks from input...", websocket)
 
-        await self.logger(f"Get chunks from {self.file}...")
         chunks = await Analyzer.aget_chunks_from_text(self.content)
-        await self.logger("Chunks generated!")
+        await self.logger("Chunks generated!", websocket)
 
         # Summarize chunks
-        await self.logger("Summarizing chunks...")
+        await self.logger("Summarizing chunks...", websocket)
         chunk_summaries = (await self.asummarize_chunks(
             chunks, await self.aget_prompt_template(Analyzer.main_prompt)))
-        await self.logger("Chunks summarized!")
+        await self.logger("Chunks summarized!", websocket)
 
         # Create similarity matrix
-        await self.logger("Creating similarity matrix...")
+        await self.logger("Creating similarity matrix...", websocket)
         similarity_matrix = await Analyzer.acreate_similarity_matrix(chunks)
-        await self.logger("Similarity matrix created!")
+        await self.logger("Similarity matrix created!", websocket)
 
         # Get topics
-        await self.logger("Getting topics...")
+        await self.logger("Getting topics...", websocket)
         topics = await Analyzer.aget_topics(similarity_matrix)
-        await self.logger("Topics are got!")
+        await self.logger("Topics are got!", websocket)
 
         # Summarize stage
-        await self.logger("Get stage summary...")
-        stage_summary = await self.asummarize_stage(chunk_summaries, topics)
+        await self.logger("Get stage summary...", websocket)
+        stage_summary = await self.asummarize_stage(chunk_summaries, topics, websocket)
+        if is_github:
+            await self.logger(f'Summary for {self.file}:\n{stage_summary}\n', websocket)
+        else:
+            await self.logger(f'Summary for input text:\n{stage_summary}\n', websocket)
 
-        await self.logger(f'Summary for {self.file}:\n{stage_summary}\n')
-
-    async def logger(self, message):
+    async def logger(self, message, websocket: WebSocket):
         print(message)
-        await self.websocket.send_text(message)
+        await websocket.send_text(message)
