@@ -3,7 +3,7 @@ from pathlib import Path
 
 import openai
 import uvicorn
-from fastapi import FastAPI, WebSocket, Request
+from fastapi import FastAPI, WebSocket, Request, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
 
 from analyzer import Analyzer
@@ -13,21 +13,9 @@ BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(Path(BASE_DIR, 'templates')))
 log_file = "Logs"
 
-from fastapi.middleware.cors import CORSMiddleware
+port = os.environ["PORT"]
 
 app = FastAPI(title='Code Analyzer')
-
-origins = [
-    "*",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 @app.get("/")
@@ -49,18 +37,19 @@ async def get(request: Request):
 @app.websocket("/ws/")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    while True:
-        try:
+    try:
+        while True:
             # Wait for any message from the client
             params = await websocket.receive_json()
-            github_repo = params.get('github_repo')
+            input = params.get('github_repo')
             openai_key = params.get('openai_key')
-
-            is_url = True if github_repo is not None and 'http' in github_repo else False
+            is_http = input.strip().lower().startswith('http')
+            is_url = True if input is not None and is_http else False
             is_openai_key = True if openai_key is not None and '-' in openai_key else False
             if is_url and is_openai_key:
-
-                await websocket.send_text("Details saved. Please not reload the page!")
+                await websocket.send_text(
+                    "Details saved. Please do not reload the page!"
+                )
                 await websocket.send_text("Set OpenAI secret key!")
                 openai.api_key = openai_key
                 os.environ['OPENAI_API_KEY'] = openai_key
@@ -68,8 +57,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_text("Analyzing...")
                 await websocket.send_text("Fetching files from public repository...")
 
-                files, owner, repo_name = await Analyzer.aget_files_from_dir(github_repo,
-                                                                             websocket)
+                files, owner, repo_name = await Analyzer.aget_files_from_dir(
+                    input, websocket
+                )
                 await websocket.send_text("Files are fetched!")
                 await websocket.send_text("Iterating over fetched files...")
                 if files and owner and repo_name:
@@ -78,29 +68,30 @@ async def websocket_endpoint(websocket: WebSocket):
                                                        repo_name=repo_name)
                     items = files.items()
                     for _file, _content in items:
-                        code_analyzer = Analyzer(_file, _content, websocket)
-                        await code_analyzer.aanalyze_file()
-                        break
+                        code_analyzer = Analyzer(_content, _file)
+                        await code_analyzer.aanalyze_file(websocket)
 
                     await websocket.send_text("All files processed!")
                 else:
                     await websocket.send_text("Something happen with the API")
-
+            elif not is_url and is_openai_key:
+                code_analyzer = Analyzer(input)
+                await code_analyzer.aanalyze_file(websocket, is_github=False)
             else:
                 await websocket.send_text("Please check provided details")
 
-        except Exception as e:
-            print('error:', e)
-            await websocket.send_text(f'error:{e}')
+            await websocket.send_text('Analyzing completed.')
 
-        await websocket.send_text('Analyzing completed.')
+    except WebSocketDisconnect as e:
+        print('error:', e)
+        await websocket.send_text(f'error:{e}')
 
 
 if __name__ == "__main__":
     uvicorn.run(
         "run:app",
-        host="localhost",
-        port=8000,
+        host="0.0.0.0",
+        port=port,
         log_level="info",
         reload=True,
         workers=1,

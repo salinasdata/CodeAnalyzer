@@ -31,15 +31,15 @@ jobs:
 
     - name: Build and push container image to registry
       run: |
-        docker build . -t codeanalyzer.azurecr.io/fastapi-cd:${{ github.sha }}
-        docker push codeanalyzer.azurecr.io/fastapi-cd:${{ github.sha }}
+        docker build . -t codeanalyzer.azurecr.io/codeanalyzer:${{ github.sha }}
+        docker push codeanalyzer.azurecr.io/codeanalyzer:${{ github.sha }}
         
 
     - name: Deploy to App Service
       uses: azure/webapps-deploy@v2
       with:
-        app-name: 'code_analyzer'
-        images: 'codeanalyzer.azurecr.io/fastapi-cd:${{ github.sha }}'
+        app-name: 'code-analyzer'
+        images: 'codeanalyzer.azurecr.io/codeanalyzer:${{ github.sha }}'
         slot-name: 'staging'
 
 

@@ -1,4 +1,4 @@
-from app.backend.analyzer import Analyzer
+from analyzer import Analyzer
 
 if __name__ == "__main__":
     """
@@ -10,7 +10,7 @@ if __name__ == "__main__":
 
     # Iterate over files and process
     for _file, _content in Analyzer.read_files(files).items():
-        code_analyzer = Analyzer(_file, _content)
+        code_analyzer = Analyzer( _content,_file)
         code_analyzer.analyze_file()
 
     print('All files processed.')

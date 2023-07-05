@@ -12,12 +12,13 @@
 </div>
 <br/>
 <div class="flex items-center py-2 px-3">
-    <div class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-    >
+    <div class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
         <form id="message-form" action="" onsubmit="sendMessage(event)">
-            <label for="github_repo_id">GitHub public repository URL: </label>
-            <input class="flex justify-center block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                   type="text" id="github_repo_id" autocomplete="off"/>
+            <label for="github_repo_id">GitHub public repository URL or large text input to analyze: </label>
+            <textarea class="flex justify-center block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border
+            border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600
+            dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                      type="text" id="github_repo_id" autocomplete="off" maxlength="10000"></textarea>
             <label for="openai_key_id">OpenAI secret key: </label>
             <input class="flex justify-center block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
                    type="text" id="openai_key_id" autocomplete="off"/>
@@ -48,7 +49,7 @@
     ws_log.onmessage = function (event) {
         var logs = document.getElementById("logs");
         var log_data = event.data;
-        logs.innerHTML += "<span>" + log_data + "</span>";
+        logs.innerHTML += "<div>" + log_data + "</div>";
     };
 
     form.onsubmit = function (e) {
@@ -61,7 +62,7 @@
         }
         console.log(JSON.stringify(params) )
         ws_log.send(JSON.stringify(params));
-
+        logs.innerHTML = "";
         return false;
     };
 

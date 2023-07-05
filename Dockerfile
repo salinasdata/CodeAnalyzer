@@ -1,5 +1,5 @@
 # python base image in the container from Docker Hub
-FROM python:3.11.4-slim-buster
+FROM python:3.11.4-slim
 
 # copy files to the /app folder in the container
 WORKDIR /usr/src/app
