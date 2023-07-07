@@ -11,12 +11,12 @@ from analyzer import Analyzer
 BASE_DIR = Path(__file__).resolve().parent
 
 templates = Jinja2Templates(directory=str(Path(BASE_DIR, 'templates')))
-log_file = "Logs"
+log_file = "Your Results"
 
-port = os.environ.get("PORT") or "8000"
-host_url = os.environ.get("HOST") or "0.0.0.0:8000"
+port = os.environ.get("PORT") or 8000
+host_url = os.environ.get("HOST") or "code-analyzer.azurewebsites.net"
 
-app = FastAPI(title='Code Analyzer')
+app = FastAPI(title='Code Analyzer Demo')
 
 
 @app.get("/")
@@ -29,7 +29,7 @@ async def get(request: Request):
     Returns:
         TemplateResponse: Jinja template with context data.
     """
-    context = {"title": "Code Analyzer tool",
+    context = {"title": "Code Analyzer Demo",
                "log_file": log_file,
                "host_url": host_url}
     return templates.TemplateResponse("index.html",
