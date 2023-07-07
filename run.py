@@ -13,7 +13,6 @@ BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(Path(BASE_DIR, 'templates')))
 log_file = "Logs"
 
-port = os.environ["PORT"]
 
 app = FastAPI(title='Code Analyzer')
 
@@ -91,7 +90,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "run:app",
         host="0.0.0.0",
-        port=port,
+        port=8000,
         log_level="info",
         reload=True,
         workers=1,
