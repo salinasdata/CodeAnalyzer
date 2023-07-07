@@ -13,6 +13,8 @@ BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(Path(BASE_DIR, 'templates')))
 log_file = "Logs"
 
+port = os.environ.get("PORT") or "8000"
+host_url = os.environ.get("HOST") or "0.0.0.0:8000"
 
 app = FastAPI(title='Code Analyzer')
 
@@ -28,7 +30,8 @@ async def get(request: Request):
         TemplateResponse: Jinja template with context data.
     """
     context = {"title": "Code Analyzer tool",
-               "log_file": log_file}
+               "log_file": log_file,
+               "host_url": host_url}
     return templates.TemplateResponse("index.html",
                                       {"request": request, "context": context})
 
@@ -90,7 +93,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "run:app",
         host="0.0.0.0",
-        port=8000,
+        port=port,
         log_level="info",
         reload=True,
         workers=1,
