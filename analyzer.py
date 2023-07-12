@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import glob
 from datetime import datetime
@@ -124,10 +125,12 @@ class Analyzer:
                     else:
                         message = "Repository tree is empty"
                         await websocket.send_text(message)
+                        await asyncio.sleep(0.01)
                         print(message)
                 else:
                     message = f"Repository cannot bee accessed {github_repo}"
                     await websocket.send_text(message)
+                    await asyncio.sleep(0.01)
                     print(message)
 
         return files_list, owner, repo_name
@@ -479,3 +482,4 @@ class Analyzer:
     async def logger(self, message, websocket: WebSocket):
         print(message)
         await websocket.send_text(message)
+        await asyncio.sleep(0.01)
