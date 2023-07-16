@@ -75,11 +75,25 @@ async def websocket_endpoint(websocket: WebSocket):
                                                        owner=owner,
                                                        repo_name=repo_name)
                     items = files.items()
+                    result = ""
                     for _file, _content in items:
                         code_analyzer = Analyzer(_content, _file)
-                        await code_analyzer.aanalyze_file(websocket)
-
+                        summary = (
+                            await code_analyzer.aanalyze_file(websocket)
+                        )
+                        result += summary
                     await websocket.send_text("All files processed!")
+                    await asyncio.sleep(0.01)
+
+                    await websocket.send_text("Generating final summary for each "
+                                              "file final summary...")
+                    await asyncio.sleep(0.01)
+
+                    code_analyzer = Analyzer(result)
+
+                    await code_analyzer.aanalyze_file(websocket, is_github=False)
+                    await websocket.send_text("Final summary is generated!")
+
                     await asyncio.sleep(0.01)
                 else:
                     await websocket.send_text("Something happen with the API")
@@ -106,5 +120,5 @@ if __name__ == "__main__":
         port=port,
         log_level="info",
         reload=True,
-        workers=1,
+        workers=4,
     )
