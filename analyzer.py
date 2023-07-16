@@ -615,7 +615,8 @@ class Analyzer:
 
         print(f'Summary for {self.file}:\n{stage_summary}\n')
 
-    async def aanalyze_file(self, websocket: WebSocket, is_github: bool = True) -> None:
+    async def aanalyze_file(self, websocket: WebSocket,
+                            is_github: bool = True) -> Optional[str]:
         if is_github:
             await self.logger(f'Processing {self.file}...', websocket)
             await self.logger(f"Get chunks from {self.file}...", websocket)
@@ -662,6 +663,7 @@ class Analyzer:
         final_summary = out['final_summary']
         if is_github:
             await self.logger(f'Summary for {self.file}:\n{final_summary}\n', websocket)
+            return final_summary
         else:
             await self.logger(f'Summary for input text:\n{final_summary}\n', websocket)
 
