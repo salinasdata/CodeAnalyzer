@@ -16,7 +16,7 @@ log_file = "Your Results"
 
 port = os.environ.get("PORT") or 8000
 host_url = os.environ.get("HOST") or "code-analyzer.azurewebsites.net"
-
+request_url = "https://sebastianeumann.com/demo-api-request/"
 app = FastAPI(title='Code Analyzer Demo')
 
 
@@ -32,7 +32,8 @@ async def get(request: Request):
     """
     context = {"title": "Code Analyzer Demo",
                "log_file": log_file,
-               "host_url": host_url}
+               "host_url": host_url,
+               "request_url": request_url}
     return templates.TemplateResponse("index.html",
                                       {"request": request, "context": context})
 
