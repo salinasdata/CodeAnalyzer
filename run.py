@@ -2,6 +2,7 @@ import asyncio
 import os
 from pathlib import Path
 
+import aiohttp
 import openai
 import uvicorn
 from fastapi import FastAPI, WebSocket, Request, WebSocketDisconnect
@@ -51,54 +52,63 @@ async def websocket_endpoint(websocket: WebSocket):
             is_url = True if input is not None and is_http else False
             is_openai_key = True if openai_key is not None and '-' in openai_key else False
             if is_url and is_openai_key:
-                await websocket.send_text(
-                    "Details saved. Please do not reload the page!"
-                )
-                await asyncio.sleep(0.01)
-                await websocket.send_text("Set OpenAI secret key!")
-                await asyncio.sleep(0.01)
-                openai.api_key = openai_key
-                os.environ['OPENAI_API_KEY'] = openai_key
+                async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False)) as aio_session:
 
-                await websocket.send_text("Analyzing...")
-                await asyncio.sleep(0.01)
-                await websocket.send_text("Fetching files from public repository...")
-                await asyncio.sleep(0.01)
-                files, owner, repo_name = await Analyzer.aget_files_from_dir(
-                    input, websocket
-                )
-                await websocket.send_text("Files are fetched!")
-                await asyncio.sleep(0.01)
-                await websocket.send_text("Iterating over fetched files...")
-                await asyncio.sleep(0.01)
-                if files and owner and repo_name:
-                    files = await Analyzer.aread_files(file_paths=files,
-                                                       owner=owner,
-                                                       repo_name=repo_name)
-                    items = files.items()
-                    result = ""
-                    for _file, _content in items:
-                        code_analyzer = Analyzer(_content, _file)
-                        summary = (
-                            await code_analyzer.aanalyze_file(websocket)
-                        )
-                        result += summary
-                    await websocket.send_text("All files processed!")
-                    await asyncio.sleep(0.01)
+                    async with aio_session.get(input) as website:
+                        if website.status == 200:
+                            await websocket.send_text(
+                                "Details saved. Please do not reload the page!"
+                            )
+                            await asyncio.sleep(0.01)
+                            await websocket.send_text("Set OpenAI secret key!")
+                            await asyncio.sleep(0.01)
+                            openai.api_key = openai_key
+                            os.environ['OPENAI_API_KEY'] = openai_key
 
-                    await websocket.send_text("Generating final summary for each "
-                                              "file final summary...")
-                    await asyncio.sleep(0.01)
+                            await websocket.send_text("Analyzing...")
+                            await asyncio.sleep(0.01)
+                            await websocket.send_text("Fetching files from public repository...")
+                            await asyncio.sleep(0.01)
+                            files, owner, repo_name = await Analyzer.aget_files_from_dir(
+                                input, websocket
+                            )
+                            await websocket.send_text("Files are fetched!")
+                            await asyncio.sleep(0.01)
+                            await websocket.send_text("Iterating over fetched files...")
+                            await asyncio.sleep(0.01)
+                            if files and owner and repo_name:
+                                files = await Analyzer.aread_files(file_paths=files,
+                                                                   owner=owner,
+                                                                   repo_name=repo_name)
+                                items = files.items()
+                                result = ""
+                                for _file, _content in items:
+                                    code_analyzer = Analyzer(_content, _file)
+                                    summary = (
+                                        await code_analyzer.aanalyze_file(websocket)
+                                    )
+                                    result += summary
+                                await websocket.send_text("All files processed!")
+                                await asyncio.sleep(0.01)
 
-                    code_analyzer = Analyzer(result)
+                                await websocket.send_text("Generating final summary for each "
+                                                          "file final summary...")
+                                await asyncio.sleep(0.01)
 
-                    await code_analyzer.aanalyze_file(websocket, is_github=False)
-                    await websocket.send_text("Final summary is generated!")
+                                code_analyzer = Analyzer(result)
 
-                    await asyncio.sleep(0.01)
-                else:
-                    await websocket.send_text("Something happen with the API")
-                    await asyncio.sleep(0.01)
+                                await code_analyzer.aanalyze_file(websocket, is_github=False)
+                                await websocket.send_text("Final summary is generated!")
+
+                                await asyncio.sleep(0.01)
+                            else:
+                                await websocket.send_text(
+                                    "Something happen with the API")
+                                await asyncio.sleep(0.01)
+                        else:
+                            await websocket.send_text("Please check provided details")
+                            await asyncio.sleep(0.01)
+
             elif not is_url and is_openai_key:
                 code_analyzer = Analyzer(input)
                 await code_analyzer.aanalyze_file(websocket, is_github=False)
